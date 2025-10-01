@@ -1,0 +1,94 @@
+/* Set the height and width of the map */
+#map {
+  height: 700px;
+  width: 100%;
+  border: 2px solid #333;
+  border-radius: 5px;
+}
+
+/* Center the title */
+h2 {
+  text-align: center;
+  font-family: Arial, sans-serif;
+  color: #333;
+}
+
+/* Dropdown menu style */
+#layerSelect {
+  position: absolute;
+  top: 10px;
+  left: 180px;
+  z-index: 1000;
+  padding: 8px 12px;
+  background-color: white;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+/* Legend styling */
+.legend {
+  background: white;
+  padding: 10px;
+  color: #333;
+  font-size: 14px;
+  border-radius: 6px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  max-width: 220px;
+}
+
+/* Flood color swatches */
+.legend .flood-legend i {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  margin-right: 6px;
+  opacity: 0.8;
+}
+
+/* Tabs header */
+.tab-header {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 6px;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid #ccc;
+  background: #f9f9f9;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tab-button.active {
+  background: #007bff;
+  color: white;
+  border-bottom: 2px solid #0056b3;
+}
+
+/* Tab content */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Other Layers section */
+.legend .other-layers {
+  margin-top: 6px;
+}
+
+.legend .other-layers input[type="checkbox"] {
+  margin-right: 6px;
+}
+
+.legend .other-layers label {
+  cursor: pointer;
+}
+
+.legend .other-layers input[type="checkbox"]:hover + label {
+  color: #007bff;
+}
