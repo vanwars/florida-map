@@ -1,6 +1,5 @@
 // Initialize the map and set view to Florida
-var map = L.map("map").setView([28.48, -81.4], 2);
-
+var map = L.map("map").setView([28.48, -81.4], 6);
 map.on("tileerror", function (err) {
     console.warn("Tile failed to load:", err.tile.src);
 });
@@ -22,11 +21,31 @@ L.Control.geocoder({
 
 // Popup on map click
 var popup = L.popup();
-map.on("click", function (e) {
-    popup
-        .setLatLng(e.latlng)
-        .setContent("You clicked the map at " + e.latlng.toString())
-        .openOn(map);
+map.on("click", async function (e) {
+    const buffer = 0.01;
+    const clickLatLng = e.latlng;
+
+    const bbox = [
+        clickLatLng.lng - buffer, // minX
+        clickLatLng.lat - buffer, // minY
+        clickLatLng.lng + buffer, // maxX
+        clickLatLng.lat + buffer, // maxY
+    ];
+    const url = `http://localhost:8080/geoserver/wms?service=WMS&version=1.1.1&request=GetFeatureInfo&layers=ne:flood_7ft&query_layers=ne:flood_7ft&BBOX=${bbox.join(
+        ","
+    )}&SRS=EPSG:4326&X=128&Y=128&WIDTH=256&HEIGHT=256&INFO_FORMAT=application/json`;
+    const response = await fetch(url);
+    const data = await response.json();
+    console.log(data);
+    const content = data.features.map((feature) => feature.properties);
+    console.log(content);
+    const htmlText = `
+        You clicked the map at ${e.latlng.toString()}<br>
+        7Ft Flood Risk: ${
+            content.length > 0 ? content[0].PALETTE_INDEX : "No risk"
+        }
+        `;
+    popup.setLatLng(e.latlng).setContent(htmlText).openOn(map);
 });
 
 // Flood layers
@@ -74,7 +93,6 @@ const floodLayers = {
             attribution: "Geoserver",
             minZoom: 1,
             maxZoom: 20,
-            errorTileUrl: "images/transparent.png",
         }
     ),
     disputed: L.tileLayer(
@@ -83,7 +101,14 @@ const floodLayers = {
             attribution: "Disputed Areas",
             minZoom: 1,
             maxZoom: 3,
-            errorTileUrl: "images/transparent.png",
+        }
+    ),
+    flood_7ft: L.tileLayer(
+        "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:flood_7ft/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
+        {
+            attribution: "Flood 7ft",
+            minZoom: 1,
+            maxZoom: 22,
         }
     ),
 };
