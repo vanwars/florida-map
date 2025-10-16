@@ -1,150 +1,178 @@
 // Initialize the map and set view to Florida
 var map = L.map("map").setView([28.48, -81.4], 6);
 map.on("tileerror", function (err) {
-    console.warn("Tile failed to load:", err.tile.src);
+  console.warn("Tile failed to load:", err.tile.src);
 });
 
 // Add OpenStreetMap tile layer
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 }).addTo(map);
 
 // Add geocoder control to the map
 L.Control.geocoder({
-    defaultMarkGeocode: true,
-    placeholder: "Search for location...",
-    errorMessage: "Location not found.",
-    showResultIcons: true,
+  defaultMarkGeocode: true,
+  placeholder: "Search for location...",
+  errorMessage: "Location not found.",
+  showResultIcons: true,
 }).addTo(map);
+
+async function getFeatureInfo(latlng, layerName) {
+  const buffer = 0.01;
+  const clickLatLng = latlng;
+  const bbox = [
+    clickLatLng.lng - buffer, // minX
+    clickLatLng.lat - buffer, // minY
+    clickLatLng.lng + buffer, // maxX
+    clickLatLng.lat + buffer, // maxY
+  ];
+  const bboxString = bbox.join(",");
+  const suffix =
+    "&SRS=EPSG:4326&X=128&Y=128&WIDTH=256&HEIGHT=256&INFO_FORMAT=application/json";
+  const rootUrl =
+    "http://localhost:8080/geoserver/wms?service=WMS&version=1.1.1&request=GetFeatureInfo";
+  const layers = [layerName].join(",");
+  const url = `${rootUrl}&layers=${layers}&query_layers=${layers}&BBOX=${bboxString}${suffix}`;
+  console.log(url);
+  const response = await fetch(url);
+  const data = await response.json();
+  console.log(data);
+  return data;
+}
 
 // Popup on map click
 var popup = L.popup();
 map.on("click", async function (e) {
-    const buffer = 0.01;
-    const clickLatLng = e.latlng;
+  const latlng = e.latlng;
+  const layerDictionary = {
+    "ne:flood_7ft": { title: "7Ft Flood Risk", property: "PALETTE_INDEX" },
+    "ne:countries": { title: "Countries", property: "NAME" },
+  };
+  const layers = Object.keys(layerDictionary);
 
-    const bbox = [
-        clickLatLng.lng - buffer, // minX
-        clickLatLng.lat - buffer, // minY
-        clickLatLng.lng + buffer, // maxX
-        clickLatLng.lat + buffer, // maxY
-    ];
-    const url = `http://localhost:8080/geoserver/wms?service=WMS&version=1.1.1&request=GetFeatureInfo&layers=ne:flood_7ft&query_layers=ne:flood_7ft&BBOX=${bbox.join(
-        ","
-    )}&SRS=EPSG:4326&X=128&Y=128&WIDTH=256&HEIGHT=256&INFO_FORMAT=application/json`;
-    const response = await fetch(url);
-    const data = await response.json();
-    console.log(data);
-    const content = data.features.map((feature) => feature.properties);
-    console.log(content);
-    const htmlText = `
-        You clicked the map at ${e.latlng.toString()}<br>
-        7Ft Flood Risk: ${
-            content.length > 0 ? content[0].PALETTE_INDEX : "No risk"
-        }
+  // put all of your queries here:
+  const results = await Promise.all(
+    layers.map((layer) => getFeatureInfo(latlng, layer))
+  );
+  console.log(results);
+  const data = results.map((result, index) => {
+    return result.features.map((feature) => feature.properties);
+  });
+  html = data
+    .map((item, index) => {
+      const title = layerDictionary[layers[index]].title;
+      const dataField = layerDictionary[layers[index]].property;
+      return `<p>${title}: ${
+        item.length > 0 ? item[0][dataField] : "No data"
+      }</p>`;
+    })
+    .join("");
+  const htmlText = `
+        <p>You clicked the map at ${e.latlng.toString()}</p>
+        ${html}
         `;
-    popup.setLatLng(e.latlng).setContent(htmlText).openOn(map);
+  popup.setLatLng(e.latlng).setContent(htmlText).openOn(map);
 });
 
 // Flood layers
 const floodLayers = {
-    "1ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood1Ft/{z}/{x}/{y}.png", {
-        attribution: "Flood 1ft",
-        minZoom: 1,
-        maxZoom: 11,
-    }),
-    "2ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood2Ft/{z}/{x}/{y}.png", {
-        attribution: "Flood 2ft",
-        minZoom: 1,
-        maxZoom: 11,
-    }),
-    "3ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood3Ft/{z}/{x}/{y}.png", {
-        attribution: "Flood 3ft",
-        minZoom: 1,
-        maxZoom: 11,
-    }),
-    "4ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood4Ft/{z}/{x}/{y}.png", {
-        attribution: "Flood 4ft",
-        minZoom: 1,
-        maxZoom: 11,
-    }),
-    "5ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood5Ft/{z}/{x}/{y}.png", {
-        attribution: "Flood 5ft",
-        minZoom: 1,
-        maxZoom: 11,
-    }),
-    "6ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood6Ft/{z}/{x}/{y}.png", {
-        attribution: "Flood 6ft",
-        minZoom: 1,
-        maxZoom: 11,
-        errorTileUrl: "images/transparent.png",
-    }),
-    "7ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood7Ft/{z}/{x}/{y}.png", {
-        attribution: "Flood 7ft",
-        minZoom: 1,
-        maxZoom: 11,
-        errorTileUrl: "images/transparent.png",
-    }),
-    geoserver: L.tileLayer(
-        "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:world/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
-        {
-            attribution: "Geoserver",
-            minZoom: 1,
-            maxZoom: 20,
-        }
-    ),
-    disputed: L.tileLayer(
-        "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:disputed_areas/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
-        {
-            attribution: "Disputed Areas",
-            minZoom: 1,
-            maxZoom: 3,
-        }
-    ),
-    flood_7ft: L.tileLayer(
-        "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:flood_7ft/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
-        {
-            attribution: "Flood 7ft",
-            minZoom: 1,
-            maxZoom: 22,
-        }
-    ),
+  "1ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood1Ft/{z}/{x}/{y}.png", {
+    attribution: "Flood 1ft",
+    minZoom: 1,
+    maxZoom: 11,
+  }),
+  "2ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood2Ft/{z}/{x}/{y}.png", {
+    attribution: "Flood 2ft",
+    minZoom: 1,
+    maxZoom: 11,
+  }),
+  "3ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood3Ft/{z}/{x}/{y}.png", {
+    attribution: "Flood 3ft",
+    minZoom: 1,
+    maxZoom: 11,
+  }),
+  "4ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood4Ft/{z}/{x}/{y}.png", {
+    attribution: "Flood 4ft",
+    minZoom: 1,
+    maxZoom: 11,
+  }),
+  "5ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood5Ft/{z}/{x}/{y}.png", {
+    attribution: "Flood 5ft",
+    minZoom: 1,
+    maxZoom: 11,
+  }),
+  "6ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood6Ft/{z}/{x}/{y}.png", {
+    attribution: "Flood 6ft",
+    minZoom: 1,
+    maxZoom: 11,
+    errorTileUrl: "images/transparent.png",
+  }),
+  "7ft": L.tileLayer("http://127.0.0.1:5500/tiles/Flood7Ft/{z}/{x}/{y}.png", {
+    attribution: "Flood 7ft",
+    minZoom: 1,
+    maxZoom: 11,
+    errorTileUrl: "images/transparent.png",
+  }),
+  geoserver: L.tileLayer(
+    "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:world/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
+    {
+      attribution: "Geoserver",
+      minZoom: 1,
+      maxZoom: 20,
+    }
+  ),
+  disputed: L.tileLayer(
+    "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:disputed_areas/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
+    {
+      attribution: "Disputed Areas",
+      minZoom: 1,
+      maxZoom: 3,
+    }
+  ),
+  flood_7ft: L.tileLayer(
+    "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:flood_7ft/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
+    {
+      attribution: "Flood 7ft",
+      minZoom: 1,
+      maxZoom: 22,
+    }
+  ),
 };
 
 // Labels layer
 
 const coastlines = L.tileLayer(
-    "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:coastlines/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
-    { attribution: "Coastlines", minZoom: 1, maxZoom: 11 }
+  "http://localhost:8080/geoserver/gwc/service/wmts/rest/ne:coastlines/EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png",
+  { attribution: "Coastlines", minZoom: 1, maxZoom: 11 }
 );
 const labelsOnly = L.tileLayer(
-    "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
-    {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: "abcd",
-        maxZoom: 19,
-    }
+  "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",
+  {
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: "abcd",
+    maxZoom: 19,
+  }
 );
 
 // County Lines layer
 const countyLines = L.tileLayer(
-    "http://127.0.0.1:5500/tiles/CountyLine/{z}/{x}/{y}.png",
-    {
-        attribution: "County Lines",
-        minZoom: 1,
-        maxZoom: 11,
-    }
+  "http://127.0.0.1:5500/tiles/CountyLine/{z}/{x}/{y}.png",
+  {
+    attribution: "County Lines",
+    minZoom: 1,
+    maxZoom: 11,
+  }
 );
 
 const hundredyearFloodplain = L.tileLayer(
-    "http://127.0.0.1:5500/tiles/100yearFloodplain/{z}/{x}/{y}.png",
-    {
-        attribution: "100yearFloodplain",
-        minZoom: 1,
-        maxZoom: 11,
-    }
+  "http://127.0.0.1:5500/tiles/100yearFloodplain/{z}/{x}/{y}.png",
+  {
+    attribution: "100yearFloodplain",
+    minZoom: 1,
+    maxZoom: 11,
+  }
 );
 
 // Initial setup
@@ -154,9 +182,9 @@ labelsOnly.addTo(map);
 
 // Track which layers are currently on the map
 let activeLayers = {
-    countyLines: false,
-    hundredyearFloodplain: false,
-    coastlines: false,
+  countyLines: false,
+  hundredyearFloodplain: false,
+  coastlines: false,
 };
 
 // Dropdown layer switcher
@@ -164,29 +192,29 @@ const layerSelect = document.getElementById("layerSelect");
 const mapInfo = document.getElementById("mapInfo");
 
 layerSelect.addEventListener("change", function () {
-    if (map.hasLayer(currentFloodLayer)) {
-        map.removeLayer(currentFloodLayer);
-    }
-    console.log(layerSelect.value);
-    currentFloodLayer = floodLayers[layerSelect.value];
-    console.log(currentFloodLayer);
-    currentFloodLayer.addTo(map);
+  if (map.hasLayer(currentFloodLayer)) {
+    map.removeLayer(currentFloodLayer);
+  }
+  console.log(layerSelect.value);
+  currentFloodLayer = floodLayers[layerSelect.value];
+  console.log(currentFloodLayer);
+  currentFloodLayer.addTo(map);
 
-    // Only add labelsOnly if it's not already on the map
-    if (!map.hasLayer(labelsOnly)) {
-        labelsOnly.addTo(map);
-    }
+  // Only add labelsOnly if it's not already on the map
+  if (!map.hasLayer(labelsOnly)) {
+    labelsOnly.addTo(map);
+  }
 
-    mapInfo.innerHTML = `<p>This map shows areas in Florida potentially affected by a <strong>${layerSelect.value}-foot sea-level rise</strong>.</p>`;
+  mapInfo.innerHTML = `<p>This map shows areas in Florida potentially affected by a <strong>${layerSelect.value}-foot sea-level rise</strong>.</p>`;
 });
 
 // Legend with tabs
 var legend = L.control({ position: "bottomright" });
 
 legend.onAdd = function () {
-    var div = L.DomUtil.create("div", "legend");
+  var div = L.DomUtil.create("div", "legend");
 
-    div.innerHTML = `
+  div.innerHTML = `
     <div class="tab-header">
       <button class="tab-button active" data-tab="legendTab">Legend</button>
       <button class="tab-button" data-tab="layersTab">Other Layers</button>
@@ -226,57 +254,57 @@ legend.onAdd = function () {
     </div>
   `;
 
-    return div;
+  return div;
 };
 
 legend.addTo(map);
 
 // Tab switching logic
 document.addEventListener("click", function (e) {
-    if (e.target.classList.contains("tab-button")) {
-        const tab = e.target.getAttribute("data-tab");
+  if (e.target.classList.contains("tab-button")) {
+    const tab = e.target.getAttribute("data-tab");
 
-        document
-            .querySelectorAll(".tab-button")
-            .forEach((btn) => btn.classList.remove("active"));
-        e.target.classList.add("active");
+    document
+      .querySelectorAll(".tab-button")
+      .forEach((btn) => btn.classList.remove("active"));
+    e.target.classList.add("active");
 
-        document
-            .querySelectorAll(".tab-content")
-            .forEach((tc) => tc.classList.remove("active"));
-        document.getElementById(tab).classList.add("active");
-    }
+    document
+      .querySelectorAll(".tab-content")
+      .forEach((tc) => tc.classList.remove("active"));
+    document.getElementById(tab).classList.add("active");
+  }
 });
 
 // Checkbox interactivity
 document.addEventListener("change", function (e) {
-    if (e.target.id === "countyLines") {
-        if (e.target.checked && !activeLayers.countyLines) {
-            map.addLayer(countyLines);
-            activeLayers.countyLines = true;
-        } else if (!e.target.checked && activeLayers.countyLines) {
-            map.removeLayer(countyLines);
-            activeLayers.countyLines = false;
-        }
+  if (e.target.id === "countyLines") {
+    if (e.target.checked && !activeLayers.countyLines) {
+      map.addLayer(countyLines);
+      activeLayers.countyLines = true;
+    } else if (!e.target.checked && activeLayers.countyLines) {
+      map.removeLayer(countyLines);
+      activeLayers.countyLines = false;
     }
+  }
 
-    if (e.target.id === "hundredyearFloodplain") {
-        if (e.target.checked && !activeLayers.hundredyearFloodplain) {
-            map.addLayer(hundredyearFloodplain);
-            activeLayers.hundredyearFloodplain = true;
-        } else if (!e.target.checked && activeLayers.hundredyearFloodplain) {
-            map.removeLayer(hundredyearFloodplain);
-            activeLayers.hundredyearFloodplain = false;
-        }
+  if (e.target.id === "hundredyearFloodplain") {
+    if (e.target.checked && !activeLayers.hundredyearFloodplain) {
+      map.addLayer(hundredyearFloodplain);
+      activeLayers.hundredyearFloodplain = true;
+    } else if (!e.target.checked && activeLayers.hundredyearFloodplain) {
+      map.removeLayer(hundredyearFloodplain);
+      activeLayers.hundredyearFloodplain = false;
     }
+  }
 
-    if (e.target.id === "coastlines") {
-        if (e.target.checked && !activeLayers.coastlines) {
-            map.addLayer(coastlines);
-            activeLayers.coastlines = true;
-        } else if (!e.target.checked && activeLayers.coastlines) {
-            map.removeLayer(coastlines);
-            activeLayers.coastlines = false;
-        }
+  if (e.target.id === "coastlines") {
+    if (e.target.checked && !activeLayers.coastlines) {
+      map.addLayer(coastlines);
+      activeLayers.coastlines = true;
+    } else if (!e.target.checked && activeLayers.coastlines) {
+      map.removeLayer(coastlines);
+      activeLayers.coastlines = false;
     }
+  }
 });
